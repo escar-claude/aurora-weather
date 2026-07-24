@@ -202,7 +202,7 @@ function renderAlert(cur) {
 }
 
 function statCard({ ico, label, value, unit, sub, pct }) {
-  return `<div class="card">
+  return `<div class="card" data-tilt>
     <div class="card__head">${ico}<span class="card__label">${label}</span></div>
     <div class="card__val"><b>${value}</b>${unit ? `<small>${unit}</small>` : ''}</div>
     <div class="card__sub">${sub}</div>
@@ -437,6 +437,38 @@ function applyScene(name) {
 }
 
 /* ============================================================
+   3D GLASS TILT — pointer-reactive parallax on glass surfaces
+   ============================================================ */
+function initTilt() {
+  if (reduced) return;
+  const zone = $('.dashboard');
+  if (!zone) return;
+  const MAX = 5; // max tilt (deg)
+  let active = null;
+  const reset = (el) => {
+    if (!el) return;
+    el.classList.remove('tilting');
+    el.style.removeProperty('--rx'); el.style.removeProperty('--ry');
+    el.style.removeProperty('--mx'); el.style.removeProperty('--my');
+  };
+  zone.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    const el = e.target.closest('[data-tilt]');
+    if (el !== active) { reset(active); active = el; }
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = clamp((e.clientX - r.left) / r.width, 0, 1);
+    const py = clamp((e.clientY - r.top) / r.height, 0, 1);
+    el.classList.add('tilting');
+    el.style.setProperty('--rx', ((px - 0.5) * MAX * 2).toFixed(2) + 'deg');
+    el.style.setProperty('--ry', ((0.5 - py) * MAX * 2).toFixed(2) + 'deg');
+    el.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+    el.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+  }, { passive: true });
+  zone.addEventListener('pointerleave', () => { reset(active); active = null; });
+}
+
+/* ============================================================
    SEARCH
    ============================================================ */
 let searchTimer;
@@ -545,7 +577,7 @@ function init() {
   if (!reduced) draw(); else { buildParts(); ctx.clearRect(0, 0, W, H); }
   applyScene('snow');
   tickClock(); setInterval(tickClock, 1000);
-  initSearch(); initControls();
+  initSearch(); initControls(); initTilt();
   document.body.classList.add('loading');
   refresh();
   // hourly auto-refresh

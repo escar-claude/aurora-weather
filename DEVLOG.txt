@@ -46,3 +46,41 @@ Notes / gotchas for future me:
     read with getUTC* getters.
   - Scene tabs (sunny/rain/snow/wind) = background ambiance presets; they do NOT
     fake the reported weather data (that stays real).
+
+
+2026-07-24  Visual pass — real 3D-glass upgrade
+-----------------------------------------------
+Goal: the "glass" look was thin (flat low-opacity tiles). Push it to a proper
+frosted-glass / 3D aesthetic without adding any dependency (still no build step).
+
+What changed (CSS + a little JS, no markup logic touched):
+  - Glass surface system (styles.css): a shared .card/.panel/.current recipe —
+    backdrop-filter blur+saturate+brightness, layered gradient tint, 1px rim
+    edge, and a 4-layer box-shadow (inner top highlight + inner bottom shade +
+    two drop shadows) so panels read as floating slabs. Driven by --glass-*
+    tokens in :root so the whole system is tunable from one place.
+  - Two pseudo-layers per surface: ::before = frost gloss that TRACKS the pointer
+    (via --mx/--my), ::after = thin specular streak that sweeps once on hover.
+    Content children are forced position:relative;z-index:1 so text sits ABOVE
+    the frost (z0) and BELOW the faint sheen (z3) — checked in-browser, no
+    contrast/legibility regression.
+  - 3D tilt (app.js initTilt): pointer-reactive rotateX/Y (max 5deg) + translateZ
+    lift on the [data-tilt] surfaces, using event delegation on .dashboard so it
+    also covers the JS-injected stat cards. Fully gated behind `reduced` +
+    the existing prefers-reduced-motion CSS override.
+  - Atmosphere: slow-drifting aurora ribbons (.bg-glow::before, 28s) behind the
+    blur, plus a low-opacity SVG fractal-noise grain (body::after) to kill
+    gradient banding. Cool glow on the hero temp + clock; glow on the stat bars.
+  - Dropped the centre column divider (border-left) — panels now carry their own
+    glass edges, so the divider fought the look. Dock/alert reskinned to match.
+
+Honest note / tradeoff:
+  - The glass padding grew the page to ~1142px tall (was ~1042). Still fine: body
+    already has overflow-y:auto as the scroll fallback (see 2026-07-24 fix #2),
+    and it fits taller viewports; tightened panel rhythm to limit the growth.
+  - backdrop-filter blurs the animated particles BEHIND each panel — intended
+    (that IS the frosted read); particles stay crisp in the gaps/margins.
+
+Verified in-browser (localhost:8144): Cardiff live 27C clear, no console errors,
+no horizontal overflow, tilt + frost-tracking + sheen all firing, stacking order
+correct, and the desktop + mobile (375px) layouts both hold.
