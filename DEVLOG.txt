@@ -84,3 +84,31 @@ Honest note / tradeoff:
 Verified in-browser (localhost:8144): Cardiff live 27C clear, no console errors,
 no horizontal overflow, tilt + frost-tracking + sheen all firing, stacking order
 correct, and the desktop + mobile (375px) layouts both hold.
+
+
+2026-07-24  Visual pass 2 — dimensional hero weather icon
+---------------------------------------------------------
+The hero conditions icon was the same flat SVG as the tiny forecast-row icons.
+Gave the HERO one (only) real depth, leaving the small forecast icons clean.
+
+  - New heroIcon() in app.js — parallel to icon(), same geometry/animation
+    classes (so sun-spin / flake-fall / drop-fall still apply) but emits an
+    SVG <defs> with radial/linear gradients + a soft ground-shadow ellipse,
+    a specular gloss dot on the sun, and the wc--hero marker class. render()
+    calls heroIcon() for #currentIcon; forecast rows still call icon().
+  - Depth comes from CSS scoped under .current__icon: gradient fills via
+    fill:url(#hg-*) (CSS beats the base solid-fill so only the hero upgrades),
+    layered drop-shadow glow per condition, warm sun halo, cool moon halo.
+  - Real 3D: .current already tilts (preserve-3d + perspective), so the icon
+    wrapper gets translateZ(34px) to float ABOVE the glass and parallax as the
+    card tilts, plus a slow heroFloat bob on the svg (both die under
+    prefers-reduced-motion via the global override).
+
+Gotcha worth remembering: an SVG element's CSS `fill` property WINS over its
+`fill="..."` presentation attribute, so scoping the gradient fill in CSS
+(.current__icon .wc-sun{fill:url(#hg-sun)}) is what keeps the forecast icons
+flat while the hero gets gradients — no need to fork the shape markup.
+
+Verified in-browser: hero uses wc--hero + defs + ground; sun fill resolves to
+url(#hg-sun); wrapper matrix3d shows translateZ(34); all icon variants
+(cloud/fog/partly/rain×3/snow×3/thunder/clear-night moon) build without error.

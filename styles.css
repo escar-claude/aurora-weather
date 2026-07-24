@@ -220,8 +220,35 @@ body::after {
   margin-top: clamp(14px, 2.2vh, 26px);
   padding: clamp(18px, 2.2vw, 28px) clamp(20px, 2.4vw, 30px);
 }
-.current__icon { flex: none; width: clamp(90px, 9vw, 120px); height: clamp(90px, 9vw, 120px); }
-.current__icon svg { width: 100%; height: 100%; overflow: visible; }
+.current__icon {
+  flex: none; width: clamp(96px, 9.4vw, 126px); height: clamp(96px, 9.4vw, 126px);
+  transform: translateZ(34px);       /* float above the glass slab (parallax on tilt) */
+  transform-style: preserve-3d;
+}
+.current__icon svg { width: 100%; height: 100%; overflow: visible; animation: heroFloat 6s ease-in-out infinite; }
+@keyframes heroFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* --- 3D hero icon: gradient volume, glow, specular highlight, ground shadow --- */
+.current__icon .wc-ground { fill: url(#hg-ground); }
+.current__icon .wc-cloud {
+  fill: url(#hg-cloud);
+  stroke: rgba(255, 255, 255, 0.28); stroke-width: .5;
+  filter: drop-shadow(0 6px 9px rgba(8, 12, 28, 0.5));
+}
+.current__icon .wc-sun {
+  fill: url(#hg-sun);
+  filter: drop-shadow(0 0 16px rgba(255, 170, 70, 0.6)) drop-shadow(0 5px 8px rgba(255, 120, 40, 0.4));
+}
+.current__icon .wc-ray { stroke: #ffcf87; stroke-width: 3.4; filter: drop-shadow(0 0 5px rgba(255, 190, 90, 0.7)); }
+.current__icon .wc-gloss { fill: #fff; opacity: .55; }
+.current__icon .wc-moon {
+  fill: url(#hg-moon);
+  filter: drop-shadow(0 0 14px rgba(190, 210, 255, 0.55)) drop-shadow(0 4px 7px rgba(0, 0, 0, 0.4));
+}
+.current__icon .wc-flake { fill: #f2f7ff; filter: drop-shadow(0 0 5px rgba(200, 225, 255, 0.8)); }
+.current__icon .wc-drop { stroke: #bcd8ff; stroke-width: 3.4; filter: drop-shadow(0 0 4px rgba(130, 175, 255, 0.7)); }
+.current__icon .wc-fog { stroke: #c3d0ea; filter: drop-shadow(0 0 4px rgba(160, 180, 220, 0.5)); }
+.current__icon .wc-bolt { fill: #ffd27a; filter: drop-shadow(0 0 10px rgba(255, 196, 90, 0.85)); }
 .temp {
   display: flex; align-items: flex-start; line-height: .86;
   font-weight: 200; font-size: clamp(80px, 11vw, 118px); letter-spacing: -4px;
