@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Real-time cosmic weather dashboard — live data from Open-Meteo, no API key required." />
+  <title>Aurora Weather · 天氣</title>
+  <link rel="preconnect" href="https://api.open-meteo.com" />
+  <link rel="preconnect" href="https://geocoding-api.open-meteo.com" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%84%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+</head>
+<body data-scene="snow">
+  <!-- Animated cosmic background -->
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <main class="dashboard" id="dashboard">
+    <!-- ================= LEFT COLUMN ================= -->
+    <section class="col col--left">
+      <header class="brand">
+        <span class="sync"><i class="dot"></i>REAL-TIME SYNCHRONIZATION</span>
+        <div class="place">
+          <button class="city-btn" id="cityBtn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="cityName">Cardiff</span>
+            <svg viewBox="0 0 24 24" class="chev"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <p class="region" id="cityRegion">Cardiff · Wales, UK</p>
+        </div>
+        <div class="search" id="searchBox" hidden>
+          <input type="text" id="searchInput" placeholder="Search a city…  搜尋城市" autocomplete="off" />
+          <ul class="results" id="searchResults" role="listbox"></ul>
+        </div>
+      </header>
+
+      <div class="current">
+        <div class="current__icon" id="currentIcon"></div>
+        <div class="current__body">
+          <div class="temp"><span id="tempNow">--</span><sup>°C</sup></div>
+          <p class="desc" id="descNow">Loading current conditions…</p>
+          <ul class="micro">
+            <li><span class="k">Somatosensory</span><span class="v" id="feelsLike">--°</span></li>
+            <li><span class="k">Precipitation probability</span><span class="v" id="precipProb">--%</span></li>
+            <li><span class="k">Cloud cover</span><span class="v" id="cloudCover">--%</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="alert" id="alert" hidden>
+        <svg viewBox="0 0 24 24" class="alert__ico"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L3.7 7.7l5.4-.8z"/></svg>
+        <p id="alertText"></p>
+      </div>
+
+      <div class="stats" id="stats">
+        <!-- stat cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- ================= RIGHT COLUMN ================= -->
+    <section class="col col--right">
+      <header class="rtop">
+        <div class="clock"><span id="clock">--:--:--</span></div>
+        <p class="date" id="date">—</p>
+      </header>
+
+      <div class="panel sun">
+        <div class="panel__head">
+          <span class="label">SUNLIGHT TRACK</span>
+          <span class="meta"><span id="dayLen">— —</span><i class="sep"></i><span id="dayPct">—% complete</span></span>
+        </div>
+        <div class="sun__arc" id="sunArc"></div>
+        <div class="sun__times">
+          <div><span class="t-label">sunrise</span><span class="t-val" id="sunrise">--:--</span></div>
+          <div class="c"><span class="t-label">noon</span><span class="t-val" id="noon">--:--</span></div>
+          <div class="r"><span class="t-label">sunset</span><span class="t-val" id="sunset">--:--</span></div>
+        </div>
+      </div>
+
+      <div class="panel trend">
+        <div class="panel__head">
+          <span class="label">24-HOUR TREND</span>
+          <span class="meta" id="trendRange">Highest — · Lowest —</span>
+        </div>
+        <div class="trend__chart" id="trendChart"></div>
+      </div>
+
+      <div class="panel forecast">
+        <div class="panel__head">
+          <span class="label">7-DAY FORECAST</span>
+          <span class="meta" id="weekRange">Range — ~ —</span>
+        </div>
+        <ul class="forecast__list" id="forecastList"></ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom control bar -->
+  <nav class="dock">
+    <div class="scenes" id="scenes">
+      <button data-scene="sunny"><span class="s-ico">☀</span> sunny <i class="idx">1</i></button>
+      <button data-scene="rain"><span class="s-ico">☂</span> rain <i class="idx">2</i></button>
+      <button data-scene="snow" class="active"><span class="s-ico">❄</span> snow <i class="idx">3</i></button>
+      <button data-scene="wind"><span class="s-ico">🌬</span> strong winds <i class="idx">4</i></button>
+    </div>
+    <div class="tools">
+      <button id="soundBtn" title="Ambient sound" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z"/></svg>
+      </button>
+      <button id="refreshBtn" title="Refresh data">
+        <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/></svg>
+      </button>
+      <button id="settingsBtn" title="Toggle °C / °F">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M19.1 4.9l-2.1 2.1M7 17l-2.1 2.1"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

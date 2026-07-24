@@ -1,0 +1,48 @@
+Aurora Weather — DEVLOG
+========================
+
+2026-07-24  Initial build (cosmic-glass weather dashboard)
+---------------------------------------------------------
+Goal: rebuild a weather web app from scratch to match a supplied design mock
+(deep-space background, glass panels, snowy Cardiff dashboard).
+
+Stack decision:
+  - Plain HTML + CSS + vanilla JS, no build step, no dependencies.
+    -> trivially deployable to GitHub Pages / Vercel, no secrets to manage.
+  - Live data from Open-Meteo (free, NO API key). Covers every field in the
+    mock: current, hourly, daily, UV, AQI, dew point, visibility, pressure,
+    sunrise/sunset. Geocoding + air-quality are separate Open-Meteo endpoints.
+
+Files: index.html, styles.css, app.js, README.md, assets/
+
+Mistakes made & fixes (keep this list honest):
+  1. Alert banner showed as an empty box even when no advisory applied.
+     Cause: `.alert { display:flex }` overrides the HTML `hidden` attribute
+     (element-level `display` beats the UA `[hidden]{display:none}` rule).
+     Fix: added explicit `.alert[hidden] { display:none; }`.
+  2. Layout overflowed short viewports and `body{overflow:hidden}` CLIPPED the
+     bottom (7-day forecast unreachable). Content was ~1141px tall.
+     Fix: switched body to `overflow-x:hidden; overflow-y:auto` (scroll fallback)
+     AND tightened vertical rhythm (temp size, panel/stat margins, arc & chart
+     heights, forecast row padding) -> ~1042px, fits typical laptop screens.
+  3. launch.json lives in the WORKSPACE ROOT (/Users/escarlai/ClaudeCode/.claude),
+     not the project folder — a per-project launch.json is ignored. Added the
+     "weather-app" server there (python http.server on :5178).
+  4. Manual scene override persisted across a city change, so a new city could
+     show an ambiance unrelated to its real weather.
+     Fix: reset `state.manualScene = null` when a city is selected, so each new
+     location shows its real-weather scene; manual pick only holds for the
+     current city (until next data sync).
+
+Verified in-browser:
+  - Cardiff (default) live: 18C clear, correct sunrise/sunset, trend, 7-day.
+  - Search -> Ushuaia: -6C, wind-chill advisory shown, snow-showers forecast,
+    city-local clock, AQI/pressure/visibility all populated. No console errors.
+
+Notes / gotchas for future me:
+  - Open-Meteo hourly/daily times are LOCAL wall-clock ISO (no 'Z'). To display
+    them we parse with a forced 'Z' and read via getUTC* so we don't double-apply
+    the browser's own timezone. City clock = Date.now() + utc_offset_seconds*1000,
+    read with getUTC* getters.
+  - Scene tabs (sunny/rain/snow/wind) = background ambiance presets; they do NOT
+    fake the reported weather data (that stays real).
