@@ -223,3 +223,10 @@ Notes / gotchas for future me:
     450ms) only when the viewport leaves the current grid or zooms out a lot.
   - Scene ambiance now always follows the REAL reported weather; the old manual
     scene tabs are gone (map layers replaced them).
+
+Deployed 2026-07-27 via `vercel deploy --prod --yes` (CLI, not git integration —
+pushing to GitHub alone does NOT redeploy this project).
+Verified live on https://aurora-weather-three.vercel.app : Cardiff 15C, 96-point
+wind field loaded, 36 basemap tiles, meteogram drawn, timeline at 06:00, console
+clean. vercel.json headers confirmed on the edge — must-revalidate for html/css/js,
+immutable for vendor/.
