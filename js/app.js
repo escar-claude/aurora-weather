@@ -80,6 +80,7 @@ function init() {
   initSearch();
   initControls();
   initKeyboard();
+  initTilt();
   // console handle for poking at live state while developing
   window.auroraWX = { state, map, meteo, refresh, setTimeIndex, setLayer };
 
@@ -604,6 +605,37 @@ function initKeyboard() {
       default: break;
     }
   });
+}
+
+/* ============================================================
+   3D GLASS TILT — pointer-reactive parallax on the sidebar surfaces.
+   Delegated from .side so it also covers the JS-injected stat cards.
+   ============================================================ */
+function initTilt() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const zone = $('#side');
+  const MAX = 5;                                   // max tilt, degrees
+  let active = null;
+  const reset = (el) => {
+    if (!el) return;
+    el.classList.remove('tilting');
+    for (const p of ['--rx', '--ry', '--mx', '--my']) el.style.removeProperty(p);
+  };
+  zone.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    const el = e.target.closest('[data-tilt]');
+    if (el !== active) { reset(active); active = el; }
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = clamp((e.clientX - r.left) / r.width, 0, 1);
+    const py = clamp((e.clientY - r.top) / r.height, 0, 1);
+    el.classList.add('tilting');
+    el.style.setProperty('--rx', `${((px - 0.5) * MAX * 2).toFixed(2)}deg`);
+    el.style.setProperty('--ry', `${((0.5 - py) * MAX * 2).toFixed(2)}deg`);
+    el.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`);
+    el.style.setProperty('--my', `${(py * 100).toFixed(1)}%`);
+  }, { passive: true });
+  zone.addEventListener('pointerleave', () => { reset(active); active = null; });
 }
 
 /* ---------- clock ---------- */

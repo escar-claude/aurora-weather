@@ -4,7 +4,7 @@
 'use strict';
 
 import {
-  $, clamp, pad, icon, codeInfo, compass, beaufort, uvLevel, visLevel,
+  $, clamp, pad, icon, heroIcon, codeInfo, compass, beaufort, uvLevel, visLevel,
   aqiLevel, aqiTone, moonPhase, parseLocalISO, WEEKDAYS, MONTHS_S,
 } from './util.js';
 import { tempColor, windColor } from './scales.js';
@@ -22,7 +22,7 @@ const I = {
 export function renderHero(w, fmt) {
   const cur = w.current;
   const info = codeInfo(cur.weather_code);
-  $('#currentIcon').innerHTML = icon(info.icon, cur.is_day === 0);
+  $('#currentIcon').innerHTML = heroIcon(info.icon, cur.is_day === 0);
   $('#tempNow').textContent = fmt.temp(cur.temperature_2m);
   $('#tempUnit').textContent = `°${fmt.tempUnit}`;
   $('#descNow').textContent = info.t;
@@ -63,7 +63,7 @@ export function renderAlert(w, fmt) {
 
 /* ---------- stat cards ---------- */
 function card({ ico, label, value, unit, sub, pct, tone = '' }) {
-  return `<div class="card ${tone}">
+  return `<div class="card ${tone}" data-tilt>
     <div class="card__head">${ico}<span class="card__label">${label}</span></div>
     <div class="card__val"><b>${value}</b>${unit ? `<small>${unit}</small>` : ''}</div>
     <div class="card__sub">${sub}</div>

@@ -83,6 +83,54 @@ export function icon(key, night = false) {
   return `<svg viewBox="0 0 100 100" class="wc wc--${key}" aria-hidden="true">${body}</svg>`;
 }
 
+/* ---------- dimensional hero icon ----------
+   Same geometry and animation classes as icon(), but emits gradient <defs>,
+   a ground-shadow ellipse and a specular gloss on the sun. Used only for the
+   large current-conditions icon; forecast rows keep the flat icon(). */
+export function heroIcon(key, night = false) {
+  const defs = `<defs>
+    <radialGradient id="hg-sun" cx="40%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#fff7db"/><stop offset="52%" stop-color="#ffd166"/><stop offset="100%" stop-color="#ff9c3e"/>
+    </radialGradient>
+    <linearGradient id="hg-cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f7ff"/><stop offset="55%" stop-color="#cfd9f1"/><stop offset="100%" stop-color="#9db0d4"/>
+    </linearGradient>
+    <radialGradient id="hg-moon" cx="38%" cy="33%" r="74%">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="58%" stop-color="#dde5fc"/><stop offset="100%" stop-color="#aebbe2"/>
+    </radialGradient>
+    <radialGradient id="hg-ground" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#000" stop-opacity=".4"/><stop offset="68%" stop-color="#000" stop-opacity=".16"/><stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>`;
+  const ground = `<ellipse class="wc-ground" cx="50" cy="91" rx="30" ry="6"/>`;
+  const cloud = `<path class="wc-cloud" d="M28 62c-9 0-16-7-16-16 0-8 6-15 14-16 3-9 11-15 21-15 12 0 22 9 23 21 8 1 14 7 14 15 0 9-7 16-16 16z"/>`;
+  const sun = (cx, cy, r) => {
+    let rays = '';
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      rays += `<line class="wc-ray" x1="${cx + Math.cos(a) * (r + 5)}" y1="${cy + Math.sin(a) * (r + 5)}" x2="${cx + Math.cos(a) * (r + 14)}" y2="${cy + Math.sin(a) * (r + 14)}"/>`;
+    }
+    return `${rays}<circle class="wc-sun" cx="${cx}" cy="${cy}" r="${r}"/><circle class="wc-gloss" cx="${(cx - r * 0.34).toFixed(1)}" cy="${(cy - r * 0.36).toFixed(1)}" r="${(r * 0.34).toFixed(1)}"/>`;
+  };
+  const moon = (cx, cy, r) => `<path class="wc-moon" d="M${cx + r} ${cy}a${r} ${r} 0 1 1-${r * 1.15}-${r * 0.95}a${r * 0.8} ${r * 0.8} 0 0 0 ${r * 1.15} ${r * 0.95}z"/>`;
+  const flake = (x, y) => `<g class="wc-flake" style="transform-origin:${x}px ${y}px"><circle cx="${x}" cy="${y}" r="3.4"/></g>`;
+  const drop = (x, y) => `<line class="wc-drop" x1="${x}" y1="${y}" x2="${x - 4}" y2="${y + 12}"/>`;
+
+  let body = '';
+  switch (key) {
+    case 'clear':   body = night ? moon(50, 44, 23) : sun(50, 44, 20); break;
+    case 'partly':  body = (night ? moon(38, 34, 15) : sun(38, 34, 15)) + cloud; break;
+    case 'cloud':   body = cloud; break;
+    case 'fog':     body = cloud + `<line class="wc-fog" x1="18" y1="74" x2="82" y2="74"/><line class="wc-fog" x1="26" y1="84" x2="74" y2="84"/>`; break;
+    case 'drizzle': body = cloud + drop(38, 70) + drop(58, 70); break;
+    case 'rain':    body = cloud + drop(34, 70) + drop(48, 70) + drop(62, 70); break;
+    case 'snow':    body = cloud + flake(36, 76) + flake(50, 82) + flake(64, 76); break;
+    case 'thunder': body = cloud + `<path class="wc-bolt" d="M50 66l-10 16h8l-4 14 16-20h-9l6-10z"/>`; break;
+    default:        body = cloud;
+  }
+  return `<svg viewBox="0 0 100 100" class="wc wc--${key} wc--hero" aria-hidden="true">${defs}${ground}${body}</svg>`;
+}
+
 /* ---------- descriptors ---------- */
 const COMPASS16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 export const compass = (deg) => COMPASS16[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16];

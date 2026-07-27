@@ -23,17 +23,95 @@ Mistakes made & fixes (keep this list honest):
   2. Layout overflowed short viewports and `body{overflow:hidden}` CLIPPED the
      bottom (7-day forecast unreachable). Content was ~1141px tall.
      Fix: switched body to `overflow-x:hidden; overflow-y:auto` (scroll fallback)
-     AND tightened vertical rhythm -> ~1042px, fits typical laptop screens.
+     AND tightened vertical rhythm (temp size, panel/stat margins, arc & chart
+     heights, forecast row padding) -> ~1042px, fits typical laptop screens.
   3. launch.json lives in the WORKSPACE ROOT (/Users/escarlai/ClaudeCode/.claude),
-     not the project folder — a per-project launch.json is ignored.
+     not the project folder — a per-project launch.json is ignored. Added the
+     "weather-app" server there (python http.server on :5178).
   4. Manual scene override persisted across a city change, so a new city could
      show an ambiance unrelated to its real weather.
-     Fix: reset `state.manualScene = null` when a city is selected.
+     Fix: reset `state.manualScene = null` when a city is selected, so each new
+     location shows its real-weather scene; manual pick only holds for the
+     current city (until next data sync).
 
-Notes / gotchas:
+Verified in-browser:
+  - Cardiff (default) live: 18C clear, correct sunrise/sunset, trend, 7-day.
+  - Search -> Ushuaia: -6C, wind-chill advisory shown, snow-showers forecast,
+    city-local clock, AQI/pressure/visibility all populated. No console errors.
+
+Notes / gotchas for future me:
   - Open-Meteo hourly/daily times are LOCAL wall-clock ISO (no 'Z'). To display
     them we parse with a forced 'Z' and read via getUTC* so we don't double-apply
-    the browser's own timezone. City clock = Date.now() + utc_offset_seconds*1000.
+    the browser's own timezone. City clock = Date.now() + utc_offset_seconds*1000,
+    read with getUTC* getters.
+  - Scene tabs (sunny/rain/snow/wind) = background ambiance presets; they do NOT
+    fake the reported weather data (that stays real).
+
+
+2026-07-24  Visual pass — real 3D-glass upgrade
+-----------------------------------------------
+Goal: the "glass" look was thin (flat low-opacity tiles). Push it to a proper
+frosted-glass / 3D aesthetic without adding any dependency (still no build step).
+
+What changed (CSS + a little JS, no markup logic touched):
+  - Glass surface system (styles.css): a shared .card/.panel/.current recipe —
+    backdrop-filter blur+saturate+brightness, layered gradient tint, 1px rim
+    edge, and a 4-layer box-shadow (inner top highlight + inner bottom shade +
+    two drop shadows) so panels read as floating slabs. Driven by --glass-*
+    tokens in :root so the whole system is tunable from one place.
+  - Two pseudo-layers per surface: ::before = frost gloss that TRACKS the pointer
+    (via --mx/--my), ::after = thin specular streak that sweeps once on hover.
+    Content children are forced position:relative;z-index:1 so text sits ABOVE
+    the frost (z0) and BELOW the faint sheen (z3) — checked in-browser, no
+    contrast/legibility regression.
+  - 3D tilt (app.js initTilt): pointer-reactive rotateX/Y (max 5deg) + translateZ
+    lift on the [data-tilt] surfaces, using event delegation on .dashboard so it
+    also covers the JS-injected stat cards. Fully gated behind `reduced` +
+    the existing prefers-reduced-motion CSS override.
+  - Atmosphere: slow-drifting aurora ribbons (.bg-glow::before, 28s) behind the
+    blur, plus a low-opacity SVG fractal-noise grain (body::after) to kill
+    gradient banding. Cool glow on the hero temp + clock; glow on the stat bars.
+  - Dropped the centre column divider (border-left) — panels now carry their own
+    glass edges, so the divider fought the look. Dock/alert reskinned to match.
+
+Honest note / tradeoff:
+  - The glass padding grew the page to ~1142px tall (was ~1042). Still fine: body
+    already has overflow-y:auto as the scroll fallback (see 2026-07-24 fix #2),
+    and it fits taller viewports; tightened panel rhythm to limit the growth.
+  - backdrop-filter blurs the animated particles BEHIND each panel — intended
+    (that IS the frosted read); particles stay crisp in the gaps/margins.
+
+Verified in-browser (localhost:8144): Cardiff live 27C clear, no console errors,
+no horizontal overflow, tilt + frost-tracking + sheen all firing, stacking order
+correct, and the desktop + mobile (375px) layouts both hold.
+
+
+2026-07-24  Visual pass 2 — dimensional hero weather icon
+---------------------------------------------------------
+The hero conditions icon was the same flat SVG as the tiny forecast-row icons.
+Gave the HERO one (only) real depth, leaving the small forecast icons clean.
+
+  - New heroIcon() in app.js — parallel to icon(), same geometry/animation
+    classes (so sun-spin / flake-fall / drop-fall still apply) but emits an
+    SVG <defs> with radial/linear gradients + a soft ground-shadow ellipse,
+    a specular gloss dot on the sun, and the wc--hero marker class. render()
+    calls heroIcon() for #currentIcon; forecast rows still call icon().
+  - Depth comes from CSS scoped under .current__icon: gradient fills via
+    fill:url(#hg-*) (CSS beats the base solid-fill so only the hero upgrades),
+    layered drop-shadow glow per condition, warm sun halo, cool moon halo.
+  - Real 3D: .current already tilts (preserve-3d + perspective), so the icon
+    wrapper gets translateZ(34px) to float ABOVE the glass and parallax as the
+    card tilts, plus a slow heroFloat bob on the svg (both die under
+    prefers-reduced-motion via the global override).
+
+Gotcha worth remembering: an SVG element's CSS `fill` property WINS over its
+`fill="..."` presentation attribute, so scoping the gradient fill in CSS
+(.current__icon .wc-sun{fill:url(#hg-sun)}) is what keeps the forecast icons
+flat while the hero gets gradients — no need to fork the shape markup.
+
+Verified in-browser: hero uses wc--hero + defs + ground; sun fill resolves to
+url(#hg-sun); wrapper matrix3d shows translateZ(34); all icon variants
+(cloud/fog/partly/rain×3/snow×3/thunder/clear-night moon) build without error.
 
 
 2026-07-27  v2 — "Windy-style" pro console rebuild
@@ -108,7 +186,28 @@ Mistakes made & fixes (honest list):
  12. Topbar tools overflowed at 375px wide (sound + refresh clipped).
      Fix: smaller tools below 680px, `#soundBtn` hidden below 430px.
 
+Merging the v1 visual passes
+  The two "3D-glass" commits above landed on origin while this rebuild was in
+  progress, and they targeted markup this rebuild replaced (.current, .col--*,
+  the monolithic app.js). Rather than force-push over them, they were merged and
+  the visual system was PORTED onto the new shell:
+    - --glass-* tokens, the rim light / pointer frost / hover sheen and the
+      [data-tilt] parallax now apply to .card, .pill and .aq__cell (the
+      free-standing sidebar surfaces). initTilt() moved into js/app.js and
+      delegates from #side so it still covers the JS-injected stat cards.
+    - Map and overlay chrome (.mapcard, .layers, .timeline, .mapzoom,
+      .omni__panel, .toast) deliberately keeps an OPAQUE base and takes only the
+      rim + layered shadow: full frosted glass over a bright temperature or rain
+      field destroys the contrast the readouts need.
+    - heroIcon() moved to js/util.js and is used by panels.renderHero() for
+      #currentIcon; the gradient/glow CSS is rescoped from .current__icon to
+      .hero__icon. The forecast rows still use the flat icon().
+    - Aurora ribbons kept; the film grain moved from z-index 4 to 1 so it sits
+      UNDER the app chrome instead of veiling the map and the meteogram.
+
 Notes / gotchas for future me:
+  - An SVG element's CSS `fill` beats its `fill="..."` attribute — that is what
+    lets .hero__icon swap in gradient fills while the small icons stay flat.
   - Leaflet canvases live in a custom pane ('wx', z-index 250) so labels can sit
     above them. They carry `leaflet-zoom-animated` so Leaflet's own transition
     drives the transform, and `_animZoom` applies scale+offset on 'zoomanim'.
