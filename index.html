@@ -2,121 +2,199 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Real-time cosmic weather dashboard — live data from Open-Meteo, no API key required." />
-  <title>Aurora Weather · 天氣</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Aurora WX — professional live weather console: animated wind field map, multi-track meteogram and 7-day forecast. Powered by Open-Meteo, no API key required." />
+  <meta name="theme-color" content="#05070f" />
+  <title>Aurora WX · 天氣控制台</title>
+
   <link rel="preconnect" href="https://api.open-meteo.com" />
   <link rel="preconnect" href="https://geocoding-api.open-meteo.com" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%84%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://air-quality-api.open-meteo.com" />
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
+
+  <link rel="stylesheet" href="vendor/leaflet.css" />
+  <!-- ?v= busts the browser cache whenever the stylesheet changes shape -->
+  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%AA%3C/text%3E%3C/svg%3E" />
 </head>
-<body data-scene="snow">
-  <!-- Animated cosmic background -->
+<body class="booting">
+  <!-- ambient cosmic background -->
   <canvas id="sky" aria-hidden="true"></canvas>
   <div class="bg-glow" aria-hidden="true"></div>
 
-  <main class="dashboard" id="dashboard">
-    <!-- ================= LEFT COLUMN ================= -->
-    <section class="col col--left">
-      <header class="brand">
-        <span class="sync"><i class="dot"></i>REAL-TIME SYNCHRONIZATION</span>
-        <div class="place">
-          <button class="city-btn" id="cityBtn" aria-haspopup="listbox" aria-expanded="false">
-            <span id="cityName">Cardiff</span>
-            <svg viewBox="0 0 24 24" class="chev"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <p class="region" id="cityRegion">Cardiff · Wales, UK</p>
-        </div>
-        <div class="search" id="searchBox" hidden>
-          <input type="text" id="searchInput" placeholder="Search a city…  搜尋城市" autocomplete="off" />
-          <ul class="results" id="searchResults" role="listbox"></ul>
-        </div>
-      </header>
+  <div class="app">
+    <!-- ══════════════════ TOP BAR ══════════════════ -->
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Aurora WX home">
+        <svg viewBox="0 0 32 32" class="brand__mark" aria-hidden="true">
+          <path d="M3 12h13a4 4 0 1 0-4-4" />
+          <path d="M3 18h19a4.5 4.5 0 1 1-4.5 4.5" />
+          <path d="M3 24h9" />
+        </svg>
+        <span class="brand__txt">AURORA<b>WX</b></span>
+      </a>
 
-      <div class="current">
-        <div class="current__icon" id="currentIcon"></div>
-        <div class="current__body">
-          <div class="temp"><span id="tempNow">--</span><sup>°C</sup></div>
-          <p class="desc" id="descNow">Loading current conditions…</p>
-          <ul class="micro">
-            <li><span class="k">Somatosensory</span><span class="v" id="feelsLike">--°</span></li>
-            <li><span class="k">Precipitation probability</span><span class="v" id="precipProb">--%</span></li>
-            <li><span class="k">Cloud cover</span><span class="v" id="cloudCover">--%</span></li>
-          </ul>
+      <div class="omni" id="omni">
+        <svg viewBox="0 0 24 24" class="omni__ico" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+        <input type="text" id="searchInput" autocomplete="off" spellcheck="false"
+               placeholder="搜尋城市 / Search any city…" aria-label="Search city"
+               role="combobox" aria-expanded="false" aria-controls="omniPanel" />
+        <kbd class="omni__kbd">/</kbd>
+        <div class="omni__panel" id="omniPanel" hidden>
+          <div class="omni__group" id="favGroup" hidden>
+            <p class="omni__title">Saved</p>
+            <div class="chips" id="favChips"></div>
+          </div>
+          <ul class="omni__results" id="searchResults" role="listbox" aria-label="City results"></ul>
+          <p class="omni__hint" id="omniHint">輸入兩個字母以上開始搜尋 · type 2+ letters to search</p>
         </div>
       </div>
 
+      <div class="place">
+        <h1 class="place__name" id="cityName">Cardiff</h1>
+        <p class="place__region"><span id="cityRegion">Wales, United Kingdom</span><i class="place__sep"></i><span id="cityCoords">51.48°N 3.18°W</span></p>
+      </div>
+
+      <div class="clockbox">
+        <div class="clock" id="clock">--:--:--</div>
+        <p class="clock__meta"><span id="dateLabel">—</span><i class="place__sep"></i><span id="tzLabel">UTC</span></p>
+      </div>
+
+      <div class="tools">
+        <button id="favBtn" class="tool" title="Save this city (S)" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z"/></svg>
+        </button>
+        <button id="geoBtn" class="tool" title="Use my location (L)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><circle cx="12" cy="12" r="8"/><path d="M12 1.6v2.6M12 19.8v2.6M22.4 12h-2.6M4.2 12H1.6"/></svg>
+        </button>
+        <button id="unitBtn" class="tool tool--txt" title="Toggle °C / °F (U)">°C</button>
+        <button id="windUnitBtn" class="tool tool--txt" title="Wind units (W)">km/h</button>
+        <button id="soundBtn" class="tool" title="Ambient sound" aria-pressed="false">
+          <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 9v6h4l5 5V4L8 9H4z"/></svg>
+        </button>
+        <button id="refreshBtn" class="tool" title="Refresh data (R)">
+          <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══════════════════ SIDEBAR ══════════════════ -->
+    <aside class="side" id="side">
+      <div class="hero">
+        <div class="hero__icon" id="currentIcon"></div>
+        <div class="hero__body">
+          <div class="temp"><span id="tempNow">--</span><sup id="tempUnit">°C</sup></div>
+          <p class="hero__desc" id="descNow">Loading conditions…</p>
+          <p class="hero__feels">Feels <b id="feelsLike">--°</b><i class="place__sep"></i><span id="updatedAt">syncing…</span></p>
+        </div>
+      </div>
+
+      <div class="quick" id="quick"></div>
+
       <div class="alert" id="alert" hidden>
-        <svg viewBox="0 0 24 24" class="alert__ico"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L3.7 7.7l5.4-.8z"/></svg>
+        <svg viewBox="0 0 24 24" class="alert__ico" aria-hidden="true"><path d="M12 3l9.5 16.5h-19z"/><path d="M12 9.5v4.4M12 16.9v.1" class="alert__bang"/></svg>
         <p id="alertText"></p>
       </div>
 
-      <div class="stats" id="stats">
-        <!-- stat cards injected by JS -->
-      </div>
-    </section>
+      <div class="stats" id="stats"></div>
 
-    <!-- ================= RIGHT COLUMN ================= -->
-    <section class="col col--right">
-      <header class="rtop">
-        <div class="clock"><span id="clock">--:--:--</span></div>
-        <p class="date" id="date">—</p>
-      </header>
-
-      <div class="panel sun">
+      <section class="panel">
         <div class="panel__head">
-          <span class="label">SUNLIGHT TRACK</span>
-          <span class="meta"><span id="dayLen">— —</span><i class="sep"></i><span id="dayPct">—% complete</span></span>
+          <span class="label">Sun &amp; moon</span>
+          <span class="meta"><span id="dayLen">—</span><i class="place__sep"></i><span id="dayPct">—</span></span>
         </div>
         <div class="sun__arc" id="sunArc"></div>
         <div class="sun__times">
           <div><span class="t-label">sunrise</span><span class="t-val" id="sunrise">--:--</span></div>
-          <div class="c"><span class="t-label">noon</span><span class="t-val" id="noon">--:--</span></div>
+          <div class="c"><span class="t-label">solar noon</span><span class="t-val" id="noon">--:--</span></div>
           <div class="r"><span class="t-label">sunset</span><span class="t-val" id="sunset">--:--</span></div>
         </div>
+        <div class="moon" id="moon"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <span class="label">Air quality</span>
+          <span class="meta" id="aqiMeta">European AQI</span>
+        </div>
+        <div class="aq" id="aqPanel"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <span class="label">7-day outlook</span>
+          <span class="meta" id="weekRange">—</span>
+        </div>
+        <ul class="forecast" id="forecastList"></ul>
+      </section>
+
+      <footer class="side__foot">
+        <span>Data <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · ECMWF/GFS blend</span>
+        <span>Basemap © OpenStreetMap · CARTO</span>
+      </footer>
+    </aside>
+
+    <!-- ══════════════════ MAP STAGE ══════════════════ -->
+    <section class="stage">
+      <div class="map" id="map" aria-label="Interactive weather map"></div>
+
+      <div class="layers" id="layers" role="tablist" aria-label="Map layer"></div>
+
+      <div class="mapcard mapcard--legend" id="legend"></div>
+
+      <div class="mapcard mapcard--probe" id="probe" hidden></div>
+
+      <div class="mapstatus" id="mapStatus"><i class="spinner"></i><span>Loading wind field…</span></div>
+
+      <div class="mapzoom">
+        <button id="zoomIn" title="Zoom in">+</button>
+        <button id="zoomOut" title="Zoom out">−</button>
+        <button id="recenterBtn" title="Recentre on city">
+          <svg viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+        </button>
       </div>
 
-      <div class="panel trend">
-        <div class="panel__head">
-          <span class="label">24-HOUR TREND</span>
-          <span class="meta" id="trendRange">Highest — · Lowest —</span>
+      <!-- timeline -->
+      <div class="timeline" id="timeline">
+        <button class="tl__play" id="playBtn" title="Play / pause (space)" aria-pressed="false">
+          <svg viewBox="0 0 24 24" class="ico-play"><path d="M8 5l11 7-11 7z"/></svg>
+          <svg viewBox="0 0 24 24" class="ico-pause"><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.4z"/></svg>
+        </button>
+        <div class="tl__now">
+          <b id="tlTime">--:--</b>
+          <span id="tlDay">—</span>
         </div>
-        <div class="trend__chart" id="trendChart"></div>
-      </div>
-
-      <div class="panel forecast">
-        <div class="panel__head">
-          <span class="label">7-DAY FORECAST</span>
-          <span class="meta" id="weekRange">Range — ~ —</span>
+        <div class="tl__track" id="tlTrack" role="slider" tabindex="0"
+             aria-label="Forecast time" aria-valuemin="0" aria-valuemax="71" aria-valuenow="0">
+          <div class="tl__days" id="tlDays"></div>
+          <div class="tl__rail"><div class="tl__fill" id="tlFill"></div></div>
+          <div class="tl__knob" id="tlKnob"></div>
         </div>
-        <ul class="forecast__list" id="forecastList"></ul>
+        <button class="tl__reset" id="tlReset" title="Jump back to now">NOW</button>
       </div>
     </section>
-  </main>
 
-  <!-- Bottom control bar -->
-  <nav class="dock">
-    <div class="scenes" id="scenes">
-      <button data-scene="sunny"><span class="s-ico">☀</span> sunny <i class="idx">1</i></button>
-      <button data-scene="rain"><span class="s-ico">☂</span> rain <i class="idx">2</i></button>
-      <button data-scene="snow" class="active"><span class="s-ico">❄</span> snow <i class="idx">3</i></button>
-      <button data-scene="wind"><span class="s-ico">🌬</span> strong winds <i class="idx">4</i></button>
-    </div>
-    <div class="tools">
-      <button id="soundBtn" title="Ambient sound" aria-pressed="false">
-        <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z"/></svg>
-      </button>
-      <button id="refreshBtn" title="Refresh data">
-        <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/></svg>
-      </button>
-      <button id="settingsBtn" title="Toggle °C / °F">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M19.1 4.9l-2.1 2.1M7 17l-2.1 2.1"/></svg>
-      </button>
-    </div>
-  </nav>
+    <!-- ══════════════════ METEOGRAM ══════════════════ -->
+    <section class="meteo" id="meteo">
+      <div class="meteo__head">
+        <span class="label">Meteogram</span>
+        <span class="meta" id="meteoMeta">—</span>
+        <div class="seg" id="rangeSeg" role="tablist" aria-label="Meteogram range">
+          <button data-range="24" class="active">24H</button>
+          <button data-range="72">3D</button>
+          <button data-range="168">7D</button>
+        </div>
+        <button class="meteo__toggle" id="meteoToggle" title="Collapse / expand (M)" aria-expanded="true">
+          <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="meteo__chart" id="meteoChart"></div>
+    </section>
+  </div>
 
   <div class="toast" id="toast" hidden></div>
 
-  <script src="app.js"></script>
+  <script src="vendor/leaflet.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

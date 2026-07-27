@@ -1,0 +1,6 @@
+Leaflet 1.9.4 — https://leafletjs.com
+Copyright (c) 2010-2024, Volodymyr Agafonkin; 2010-2011, CloudMade
+BSD-2-Clause. Full licence: https://github.com/Leaflet/Leaflet/blob/main/LICENSE
+
+Vendored (rather than loaded from a CDN) so the app has no runtime third-party
+requests beyond the Open-Meteo API and the basemap tiles.

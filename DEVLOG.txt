@@ -1,5 +1,5 @@
-Aurora Weather — DEVLOG
-========================
+Aurora WX — DEVLOG
+==================
 
 2026-07-24  Initial build (cosmic-glass weather dashboard)
 ---------------------------------------------------------
@@ -23,26 +23,104 @@ Mistakes made & fixes (keep this list honest):
   2. Layout overflowed short viewports and `body{overflow:hidden}` CLIPPED the
      bottom (7-day forecast unreachable). Content was ~1141px tall.
      Fix: switched body to `overflow-x:hidden; overflow-y:auto` (scroll fallback)
-     AND tightened vertical rhythm (temp size, panel/stat margins, arc & chart
-     heights, forecast row padding) -> ~1042px, fits typical laptop screens.
+     AND tightened vertical rhythm -> ~1042px, fits typical laptop screens.
   3. launch.json lives in the WORKSPACE ROOT (/Users/escarlai/ClaudeCode/.claude),
-     not the project folder — a per-project launch.json is ignored. Added the
-     "weather-app" server there (python http.server on :5178).
+     not the project folder — a per-project launch.json is ignored.
   4. Manual scene override persisted across a city change, so a new city could
      show an ambiance unrelated to its real weather.
-     Fix: reset `state.manualScene = null` when a city is selected, so each new
-     location shows its real-weather scene; manual pick only holds for the
-     current city (until next data sync).
+     Fix: reset `state.manualScene = null` when a city is selected.
 
-Verified in-browser:
-  - Cardiff (default) live: 18C clear, correct sunrise/sunset, trend, 7-day.
-  - Search -> Ushuaia: -6C, wind-chill advisory shown, snow-showers forecast,
-    city-local clock, AQI/pressure/visibility all populated. No console errors.
-
-Notes / gotchas for future me:
+Notes / gotchas:
   - Open-Meteo hourly/daily times are LOCAL wall-clock ISO (no 'Z'). To display
     them we parse with a forced 'Z' and read via getUTC* so we don't double-apply
-    the browser's own timezone. City clock = Date.now() + utc_offset_seconds*1000,
-    read with getUTC* getters.
-  - Scene tabs (sunny/rain/snow/wind) = background ambiance presets; they do NOT
-    fake the reported weather data (that stays real).
+    the browser's own timezone. City clock = Date.now() + utc_offset_seconds*1000.
+
+
+2026-07-27  v2 — "Windy-style" pro console rebuild
+--------------------------------------------------
+Goal: same data, far more capability and a professional weather-console feel
+(the user asked for "有 d windy 既感覺").
+
+What changed
+  - App shell rewritten: topbar (search / place / city clock / units / tools),
+    left data sidebar, MAP STAGE, docked meteogram. CSS grid, 100dvh, no scroll
+    on desktop; stacks to a single column at <=1020px.
+  - NEW animated wind map (the centrepiece):
+      * Leaflet 1.9.4 VENDORED into vendor/ (no CDN at runtime), CARTO dark
+        basemap split into `dark_nolabels` (under the weather) + `dark_only_labels`
+        (over it) so place names stay readable through the colour field.
+      * Real wind grid from Open-Meteo: ONE request with 12x8 = 96 coordinates,
+        8 variables, 4 days hourly. Times forced to UTC so all points share an axis.
+      * Canvas particle advection with fading trails, positions stored in lat/lon
+        and projected with our own Web Mercator maths (matches Leaflet's EPSG:3857).
+      * Six raster layers: wind / temp / rain / cloud / humidity / pressure,
+        rendered at 1 sample per 4 css px into an ImageData then scaled up with
+        smoothing. Pressure additionally draws marching-squares ISOBARS with labels.
+      * Hover probe card (wind barb, gust, temp, rain, cloud, humidity, pressure).
+      * Click anywhere on the map = full forecast for that point.
+  - NEW 72-hour timeline scrubber with play/pause. Scrubbing drives the map field,
+    the meteogram cursor AND the whole sidebar (index 0 = live obs, anything else
+    shows a FORECAST badge with that hour's values).
+  - NEW multi-track meteogram: temperature (colour-ramped curve) + apparent temp,
+    pressure line on a right axis, precipitation bars (snow tinted differently)
+    + probability, wind speed area + gust + direction arrows, low/mid/high cloud
+    band, night shading, day dividers, hover crosshair + full readout, 24H/3D/7D.
+  - Sidebar upgrades: gusts + Beaufort, 3-hour pressure tendency, moon phase
+    (drawn from the illuminated-limb ellipse), AQI with PM2.5/PM10/O3/NO2 breakdown,
+    day-clickable 7-day rows, geolocation, saved cities, shareable URL hash.
+  - Units: °C/°F and km/h · m/s · mph · kt, both persisted.
+  - Keyboard: / search, space play, arrows scrub, 1-6 layers, u w r l s m n.
+  - `window.auroraWX` console handle for poking at live state.
+
+Mistakes made & fixes (honest list):
+  5. The whole page rendered UNSTYLED after the rewrite. styles.css was being
+     served from Chrome's cache under HEURISTIC freshness (python http.server
+     sends Last-Modified but no Cache-Control, so Chrome cached it for ~10% of
+     the file's age = hours) — the CSSOM still held the OLD 123 rules.
+     Fix (three parts): devserver.py now sends `Cache-Control: no-store`;
+     index.html links `styles.css?v=2`; vercel.json sets must-revalidate for
+     html/css/js and immutable for vendor/.
+  6. Leaflet threw `Invalid LatLng object: (NaN, NaN)` from flyTo, and because
+     the first animation frame runs SYNCHRONOUSLY inside flyTo the exception
+     propagated into refresh()'s try/catch and showed a bogus "could not load
+     live data" toast while the data was actually fine.
+     Cause: flyTo divides by `getSize()`, which is 0 if the map pane has not been
+     laid out when Leaflet caches `_size`.
+     Fix: guard in WindMap.setPlace (fall back to setView when size is 0) plus a
+     one-shot `invalidateSize()` on the frame after construction.
+  7. Meteogram tracks used FIXED pixel heights (20+88+42+48+18+axis = 254px) but
+     the dock only gives ~208px, so precipitation/wind/cloud were drawn below the
+     visible area. Fix: track heights are now shares of the available height with
+     per-track minimums, and the wind arrows got their own row.
+  8. Timeline showed `--:--` and wrong day labels on boot: renderTimelineDays()
+     and setTimeIndex() ran in init(), before the city's utc_offset was known.
+     Fix: re-run both at the end of every successful refresh().
+  9. Search results were unreadable — the `li` grid used implicit placement so
+     the name/region/coords landed in overlapping cells.
+     Fix: explicit `grid-area` for b / span / i.
+ 10. Rain (and every other) layer showed hard DIAMOND facets: plain bilinear
+     interpolation is only C0, so cell corners are visible on a coarse grid.
+     Fix: smoothstep the interpolation weights in Field.locate() (C1 across cell
+     boundaries) and raise the grid from 10x7 to 12x8.
+ 11. The `·` separator dots vanished inside `.panel__head .meta` — an inline `<i>`
+     ignores width/height. Fix: `.place__sep{display:inline-block}` and made
+     `.meta` an inline-flex row.
+ 12. Topbar tools overflowed at 375px wide (sound + refresh clipped).
+     Fix: smaller tools below 680px, `#soundBtn` hidden below 430px.
+
+Notes / gotchas for future me:
+  - Leaflet canvases live in a custom pane ('wx', z-index 250) so labels can sit
+    above them. They carry `leaflet-zoom-animated` so Leaflet's own transition
+    drives the transform, and `_animZoom` applies scale+offset on 'zoomanim'.
+    The canvas is drawn PAD=96px larger than the viewport so panning stays covered
+    without a redraw; it is only re-anchored on moveend/zoomend/resize.
+  - Particles must be stored in lat/lon, not canvas px — that way a re-anchor or
+    zoom just re-projects them instead of teleporting the flow.
+  - Wind u/v from speed+direction: direction is where the wind comes FROM, so
+    u = -spd*sin(dir), v = -spd*cos(dir); screen y is inverted (y -= v).
+  - Particle screen speed is normalised per zoom (TARGET_PX px per km/h per frame)
+    so the flow does not become frantic when zoomed in; steps > MAX_STEP_PX respawn.
+  - One field request is ~96 locations x 8 vars x 96 hours. Refetched (debounced
+    450ms) only when the viewport leaves the current grid or zooms out a lot.
+  - Scene ambiance now always follows the REAL reported weather; the old manual
+    scene tabs are gone (map layers replaced them).
